@@ -566,14 +566,8 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 
 			ctx.ui.setWidget("agent-mode-banner", [banner]);
 		} else {
-			// Show "ready" indicator when agents are available but none selected
-			const agentNames = Array.from(agents.keys()).sort();
-			if (agentNames.length > 0) {
-				const hint = ctx.ui.theme.fg("dim", "[No agent selected — /agent or pi --agent <name>]");
-				ctx.ui.setWidget("agent-mode-banner", [hint]);
-			} else {
-				ctx.ui.setWidget("agent-mode-banner", undefined);
-			}
+			// No active agent: keep the UI quiet (no empty-state banner).
+			ctx.ui.setWidget("agent-mode-banner", undefined);
 		}
 	}
 
