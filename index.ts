@@ -25,10 +25,12 @@
  * - `/agent` — Show selector to switch agents
  * - `/agent <name>` — Switch to agent directly
  * - `/agent-search <query>` — Search agents by name, description, or body
- * - `Ctrl+Shift+M` — Cycle through available agents
- * - `Alt+S` — Search agents (opens query prompt)
+ * - `pi --agent <name>` — Start with an agent selected
  * - Set default in `.pi/settings.json`: `{ "defaultAgent": "planner" }`
  * - Agent runs inline (same process) with full streaming visibility
+ *
+ * Keyboard shortcuts are intentionally not registered. Agent selection is only
+ * via `pi --agent` at startup or the `/agent` family of commands.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -36,7 +38,7 @@ import { join } from "node:path";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { DynamicBorder, getAgentDir } from "@mariozechner/pi-coding-agent";
-import { Container, Key, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
+import { Container, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
 import { Type } from "typebox";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -551,74 +553,13 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 			// Show "ready" indicator when agents are available but none selected
 			const agentNames = Array.from(agents.keys()).sort();
 			if (agentNames.length > 0) {
-				const hint = ctx.ui.theme.fg("dim", "[No agent selected — /agent, Ctrl+Shift+M (cycle), Alt+S (search)]");
+				const hint = ctx.ui.theme.fg("dim", "[No agent selected — /agent or pi --agent <name>]");
 				ctx.ui.setWidget("agent-mode-banner", [hint]);
 			} else {
 				ctx.ui.setWidget("agent-mode-banner", undefined);
 			}
 		}
 	}
-
-	/**
-	 * Cycle to next agent.
-	 */
-	async function cycleAgent(ctx: ExtensionContext): Promise<void> {
-		const agentNames = Array.from(agents.keys()).sort();
-		if (agentNames.length === 0) {
-			ctx.ui.notify(
-				"No agents found. Create agent files in ~/.pi/agent/agents/ or .pi/agents/",
-				"warning",
-			);
-			return;
-		}
-
-		const cycleList = ["(none)", ...agentNames];
-		const currentName = activeAgentName ?? "(none)";
-		const currentIndex = cycleList.indexOf(currentName);
-		const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % cycleList.length;
-		const nextName = cycleList[nextIndex];
-
-		if (nextName === "(none)") {
-			activeAgentName = undefined;
-			activeAgent = undefined;
-			if (originalState?.model) {
-				await pi.setModel(originalState.model);
-			}
-			restoreAllTools();
-			ctx.ui.notify("Agent cleared, defaults restored", "info");
-			updateStatus(ctx);
-			return;
-		}
-
-		const agent = agents.get(nextName);
-		if (!agent) return;
-
-		await applyAgent(nextName, agent, ctx);
-		/* agent activated silently */
-		updateStatus(ctx);
-	}
-
-	// ─── Keyboard Shortcut ──────────────────────────────────────────────────────
-
-	// Use Ctrl+Shift+M to avoid conflict with pi-subagents (Ctrl+Shift+A)
-	pi.registerShortcut(Key.ctrlShift("m"), {
-		description: "Cycle agents",
-		handler: async (ctx) => {
-			await cycleAgent(ctx);
-		},
-	});
-
-	// Alt+S: Search agents (Alt sends distinct ESC+letter sequence;
-	// terminals collapse Ctrl+Shift+<letter> -> Ctrl+<letter> when bound)
-	pi.registerShortcut("alt+s", {
-		description: "Search agents",
-		handler: async (ctx) => {
-			const query = await ctx.ui.input("Search agents:", "name, description, or content");
-			if (query?.trim()) {
-				await showSearchResults(ctx, query.trim());
-			}
-		},
-	});
 
 	// ─── Commands ─────────────────────────────────────────────────────────────────
 

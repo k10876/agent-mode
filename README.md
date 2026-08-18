@@ -4,26 +4,40 @@ OpenCode-style default agent system for [PI](https://pi.dev) coding agent.
 
 Define agents as markdown files with YAML frontmatter, select a default agent, and have **all prompts processed through that agent inline** — with full real-time streaming visibility. No subprocess subagents.
 
+This fork keeps agent selection on explicit entry points only:
+
+- `pi --agent <name>` at startup
+- `/agent` commands during a session
+
+Keyboard shortcuts are not registered.
+
 ## Features
 
 - **Markdown agent definitions** — Simple YAML frontmatter + body
-- **Default agent at startup** — Set in `.pi/settings.json`
-- **Keyboard shortcuts** — `Ctrl+Shift+M` to cycle, `Alt+S` to search agents
+- **Default agent at startup** — Set in `.pi/settings.json` or pass `--agent`
+- **Command-driven selection** — `/agent`, `/agents`, `/agent-search`
 - **Visual indicator** — Widget banner above editor shows active agent
 - **Model & tool restriction** — Per-agent model and tool sets
-- **Agent search** — `/agent-search <query>` or `Alt+S` to find agents by name, description, or body content
+- **Agent search** — `/agent-search <query>` to find agents by name, description, or body content
 - **Autonomous switching** — `set_agent` tool for LLM-driven switches
 - **Session persistence** — Active agent survives session resume
 
 ## Install
 
 ```bash
-pi install npm:pi-agent-mode
+pi install https://github.com/k10876/agent-mode
 ```
 
 Or for project-local:
+
 ```bash
-pi install npm:pi-agent-mode -l
+pi install https://github.com/k10876/agent-mode -l
+```
+
+Upstream npm package (includes keyboard shortcuts):
+
+```bash
+pi install npm:pi-agent-mode
 ```
 
 ## Agent Definition Format
@@ -72,11 +86,6 @@ The markdown body after frontmatter becomes the agent's system prompt instructio
 - `/agents` — List all available agents
 - `/agent-search <query>` — Search agents by name, description, or body content
 
-### Keyboard
-
-- `Ctrl+Shift+M` — Cycle through available agents
-- `Alt+S` — Search agents (opens query prompt, then shows ranked results)
-
 ### CLI
 
 ```bash
@@ -124,7 +133,7 @@ This searches agent names, descriptions, models, tools, and body content, return
 | Process | Inline (same process) | Separate subprocess |
 | Visibility | Full streaming | Results after completion |
 | Invocation | Default for all prompts | Explicit tool call |
-| Switching | `/agent` or Ctrl+Shift+M | Must specify agent each time |
+| Switching | `/agent` or `pi --agent` | Must specify agent each time |
 
 ## License
 
