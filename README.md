@@ -14,6 +14,7 @@ Keyboard shortcuts are not registered.
 ## Features
 
 - **Markdown agent definitions** — Simple YAML frontmatter + body
+- **Claude Code import** — `claude-adapter.ts` loads `~/.claude/agents` and `<cwd>/.claude/agents`
 - **Default agent at startup** — Set in `.pi/settings.json` or pass `--agent`
 - **Command-driven selection** — `/agent`, `/agents`, `/agent-search`
 - **Visual indicator** — Widget banner above editor shows active agent
@@ -42,7 +43,12 @@ pi install npm:pi-agent-mode
 
 ## Agent Definition Format
 
-Create `.md` files in `~/.pi/agent/agents/` (global) or `.pi/agents/` (project-local):
+Create `.md` files in:
+
+- `~/.pi/agent/agents/` or `.pi/agents/` (Pi-native)
+- `~/.claude/agents/` or `.claude/agents/` (Claude Code, via `claude-adapter.ts`)
+
+Pi-native agents override Claude agents with the same `name`. Pi-native example:
 
 ```markdown
 ---

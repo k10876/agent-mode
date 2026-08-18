@@ -5,7 +5,8 @@
  * with YAML frontmatter, select a default agent, and have all prompts processed
  * through that agent with full real-time visibility.
  *
- * Agent definitions (merged, project overrides global):
+ * Agent definitions (merged, later overrides earlier on name collision):
+ * - ~/.claude/agents/ and <cwd>/.claude/agents/ via claude-adapter.ts
  * - ~/.pi/agent/agents/*.md (global)
  * - <cwd>/.pi/agents/*.md (project-local)
  *
@@ -40,6 +41,7 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { DynamicBorder, getAgentDir } from "@mariozechner/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
 import { Type } from "typebox";
+import { loadClaudeAgents, shouldApplyModelRef } from "./claude-adapter.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -48,7 +50,9 @@ interface AgentDefinition {
 	description?: string;
 	model?: string;
 	tools?: string[];
+	disallowedTools?: string[];
 	body: string;
+	source?: string;
 }
 
 interface Settings {
@@ -155,8 +159,12 @@ function loadAgents(cwd: string): Map<string, AgentDefinition> {
 	const globalDir = join(getAgentDir(), "agents");
 	const projectDir = join(cwd, ".pi", "agents");
 
-	// Project agents override global agents with the same name
+	// Claude first, then Pi. Project Pi agents win over Claude on same name.
 	const agents = new Map<string, AgentDefinition>();
+
+	for (const [name, agent] of loadClaudeAgents(cwd)) {
+		agents.set(name, agent);
+	}
 
 	for (const file of findAgentFiles(globalDir)) {
 		const agent = parseAgentFile(file);
@@ -301,18 +309,25 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 	 * to connect) get folded into the active set on the next turn.
 	 */
 	function applyAgentTools(): void {
-		if (!activeAgent?.tools?.length) return;
-
-		// Normalize the whitelist for case-insensitive comparison.
-		const whitelist = new Set(activeAgent.tools.map((t) => t.toLowerCase()));
+		const whitelist = activeAgent?.tools?.length
+			? new Set(activeAgent.tools.map((t) => t.toLowerCase()))
+			: undefined;
+		const denylist = activeAgent?.disallowedTools?.length
+			? new Set(activeAgent.disallowedTools.map((t) => t.toLowerCase()))
+			: undefined;
+		if (!whitelist && !denylist) return;
 
 		const all = pi.getAllTools();
 		const merged = all
 			.filter((t) => {
+				const name = t.name.toLowerCase();
+				if (denylist?.has(name)) return false;
+
 				const src = t.sourceInfo?.source;
-				// Pass through anything not flagged as builtin (sdk, extension, MCP).
+				// Whitelist only constrains builtins; extension/MCP tools pass unless denied.
 				if (src !== "builtin") return true;
-				return whitelist.has(t.name.toLowerCase());
+				if (!whitelist) return true;
+				return whitelist.has(name);
 			})
 			.map((t) => t.name);
 
@@ -331,8 +346,9 @@ export default function agentModeExtension(pi: ExtensionAPI) {
 			};
 		}
 
-		// Apply model if specified (format: provider/model-id)
-		if (agent.model) {
+		// Apply model if specified as provider/model-id.
+		// Claude aliases (sonnet/haiku/inherit/...) are skipped by shouldApplyModelRef.
+		if (shouldApplyModelRef(agent.model)) {
 			const ref = parseModelRef(agent.model);
 			if (ref) {
 				const model = ctx.modelRegistry.find(ref.provider, ref.modelId);
